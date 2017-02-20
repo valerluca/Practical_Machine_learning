@@ -1,7 +1,7 @@
 
 #Coursera Practical Learning Machine 
 
-To see the HMTL report please click  http://valerluca.github.io/Practical_Machine_learning/Machine_learning
+To see the HMTL report please click on http://rpubs.com/valerluca/251917
 
 This is the repo for the Coursera Practical Learning Machine module. The Repo contains the files for the Peer-graded Assignment: Prediction Assignment. 
 
