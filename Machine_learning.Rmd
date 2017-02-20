@@ -1,0 +1,176 @@
+
+
+#Machine learning algorithm to predict how well barbell lifts is performed 
+
+Luca Valer
+
+
+#Executive Summary
+In this project we are going to use Machine learning algorithm to predict the manner in which a group of individual perform barbell lifts. By using data from accelerometers on the belt, forearm, arm, and dumbell we are going to learn how individual do exercise correctly and incorrectly in 5 different ways. The data is collected with devices such as Jawbone Up, Nike FuelBand, and Fitbit and it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self-movement.
+
+We are going to use Random forest algorithm on the "classe" variable within the training set. Once the model is built we will then predict the 20 different cases in the test data set.
+More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+#Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+#Exploring the data
+
+we start with loading the libraries we will beed
+```{r library , cache=FALSE,warning=FALSE,  comment=FALSE,error =FALSE}
+library(lattice)
+library(ggplot2)
+library(data.table)
+library(caret)
+library(randomForest)
+``` 
+
+
+
+We now load the two datasets into tran and test.  
+```{r load } 
+train = read.csv("./data/pml-training.csv", na.strings = c("NA","#DIV/0!", ""))
+test = read.csv("./data/pml-testing.csv", na.strings = c("NA","#DIV/0!", ""))
+dim(train)
+
+```
+The train data set contains 19622 records in 160 columns. 
+
+Let's look at the variables:
+
+```{r srt } 
+str(train)
+```
+There are three main issues with this data set:
+
+1. Not all variables are numeric/integer. Some are Factor and other logic. Those will be removed.  
+2. Many variables contain large part of data as NA. Those will be removed as they just increase the noise in the prediction
+3. the instructions were to predict using only belt, dumbbell, forearm, arm, hence we are going to delete all the other   
+
+We are going to remove the unnecessary variables.
+
+```{r training }
+# eliminate the non number and columns with NA values
+ train.subset <- function(dataset) {
+    labels <- dataset$classe
+    num <- sapply(dataset, is.numeric)
+    dataset <- dataset[, num]
+    na <- sapply(dataset, anyNA)
+    dataset <- dataset[, !na]
+    cbind(dataset, classe = labels)
+  }
+
+train <-  train.subset(train)
+
+#eliminated the extra variable 
+extra.train <- grepl("^X|timestamp|window|user_name", names(train))
+train <- train[, !extra.train]
+
+dim(train)
+
+```
+
+We have reduced the dataset to 53 variables, 52 are the model predictors.
+
+# Screening for near-zero variance variables
+
+We need to check for zero variance variable and exclude them, in case we find any.
+
+```{r zv }
+zero.variance <- nearZeroVar(train, saveMetrics=TRUE)
+if (any(zero.variance$nzv)) zero.variance else message("No variables with near zero variance")
+```
+
+
+
+#Model Building 
+
+We decided to use random forest model as there was not any specific request on what model to use.
+The first thing we need to do is partion the data set into two: the Train model and the testing. we are going to allocate 70% of the data into the training set and 30% into the testing one.
+
+
+```{r partition  }
+set.seed(1000)
+Intrain <- createDataPartition(train$classe, p=0.7, list=F)
+training.data <- train[Intrain,]
+testing.data <- train[-Intrain,]
+```
+
+As we move to build the model, we decided to use 250 as number of trees. This gives us a reasonable tradeoff between training time and accuracy.
+
+```{r rf  }
+model.rf<-train(classe ~ ., data=training.data, method="rf", trControl= trainControl(method = "cv", number = 5), ntree=250)
+model.rf$finalModel
+```
+
+
+#OOB
+The OOB (out of bag) estimate of error rate is 0.71% which it is very low.  
+
+#Evaluate the model 
+
+Firstly, the model is used to predict the outcome in the cross-validation dataset (testing). Secondly, the function confusionMatrix is used to calculate the accuracy and all other metrics of the prediction.
+
+```{r prediction  }
+model.testing <- predict(model.rf, newdata = testing.data)
+confusionMatrix(data = model.testing, reference = testing.data$classe)
+
+```
+
+When we apply the model to the sample test the model appears to be very accurate
+Accuracy : 0.9927  
+
+
+The most important variables in the model and their relative importance values are:
+```{r imp  }
+varImp(model.rf)
+```
+
+
+# Predict variable on the test set
+
+We are going to apply the same to the the test set. fisrt of all we need to apply the same data -cleaning we did to the train set
+
+```{r test }
+# eliminate the non numberi and columns with NA values
+ test.subset <- function(dataset) {
+    labels <- dataset$classe
+    num <- sapply(dataset, is.numeric)
+    dataset <- dataset[, num]
+    na <- sapply(dataset, anyNA)
+    dataset <- dataset[, !na]
+}
+
+test <-  test.subset(test)
+extra.test <- grepl("^X|timestamp|window|user_name|problem_id", names(test))
+test <- test[, !extra.test]
+dim(test)
+
+```
+
+The test set has the 52 variable we need for the prediction and 20 rows. We can now apply the model to the test set to predict the 20 values.
+
+```{r pred }
+Predict.test <- predict(model.rf, test) 
+Predict.test
+```
+
+Above the 20 values predicted form the test dataset.
+
+#Appendix
+
+Here the plot of the most important variable in the model 
+
+```{r chart }
+plot(varImp(model.rf),main = "Model Random Forest variable importance")
+```
+
+
+
